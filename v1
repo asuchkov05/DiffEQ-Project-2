@@ -1,0 +1,57 @@
+clear;
+clc;
+close all;
+
+%% SECTION 2.1
+
+% Import data
+depth = importdata('mariana_depth.csv');
+lon = importdata('mariana_longitude.csv');
+lat = importdata('mariana_latitude.csv');
+
+depth_km = depth / 1000; % Convert depth to km
+
+% Display the depth data as an image
+figure;
+imagesc(lat, lon, depth_km); % Display depth as an image
+title('Depth of the Mariana Trench (in km)');
+xlabel('Latitude (deg)');
+ylabel('Longitude (deg)');
+colormap('jet');
+colorbar;
+set(gca, 'YDir', 'normal'); % Ensure latitude increases northward
+
+% Display the depth data as a contour map
+figure;
+contourf(lat, lon, depth_km, -11:1:11); % Contours every 1 km from -11 to 11
+colormap('jet');
+colorbar;
+title('Topographic Contour Map of Mariana Trench (in km)');
+xlabel('Latitude (deg)');
+ylabel('Longitude (deg)');
+view(2); % Set to a 2D view
+
+% Overlay contour lines for labeling
+hold on;
+[contour_matrix, contour_handle] = contour(lat, lon, depth_km, -11:1:11, 'k'); % Black lines
+clabel(contour_matrix, contour_handle); % Label contours automatically
+hold off;
+
+% Analysis - Find the deepest point sampled in the trench
+[min_depth, min_index] = min(depth_km(:)); % Find minimum depth and its index
+[row, col] = ind2sub(size(depth_km), min_index); % Convert index to row and column
+
+% Retrieve latitude and longitude of the deepest point
+deepest_latitude = lat(col);
+deepest_longitude = lon(row);
+
+% Display results for the deepest point
+disp(['The deepest point sampled is ', num2str(min_depth), ' km at latitude ', ...
+      num2str(deepest_latitude), '° and longitude ', num2str(deepest_longitude), '°.']);
+
+% Calculate the average depth for regions deeper than 6 km
+deeper_than_ocean_floor = depth_km(depth_km < -6); % Select depths below 6 km
+average_depth = mean(deeper_than_ocean_floor);
+
+% Display the average depth result
+disp(['The average depth of the trench for depths below 6 km is ', num2str(average_depth), ' km.']);
