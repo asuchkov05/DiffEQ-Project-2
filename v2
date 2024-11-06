@@ -1,0 +1,195 @@
+clear;
+clc;
+close all;
+
+%% SECTION 2.1
+
+% Import data
+depth = importdata('mariana_depth.csv');
+lon = importdata('mariana_longitude.csv');
+lat = importdata('mariana_latitude.csv');
+
+depth_km = depth / 1000; % Convert depth to km
+
+% Display the depth data as an image
+figure;
+imagesc(lat, lon, depth_km); % Display depth as an image
+title('Depth of the Mariana Trench (in km)');
+xlabel('Latitude (deg)');
+ylabel('Longitude (deg)');
+colormap('jet');
+colorbar;
+set(gca, 'YDir', 'normal'); % Ensure latitude increases northward
+
+% Display the depth data as a contour map
+figure;
+contourf(lat, lon, depth_km, -11:1:11); % Contours every 1 km from -11 to 11
+colormap('jet');
+colorbar;
+title('Topographic Contour Map of Mariana Trench (in km)');
+xlabel('Latitude (deg)');
+ylabel('Longitude (deg)');
+view(2); % Set to a 2D view
+
+% Overlay contour lines for labeling
+hold on;
+[contour_matrix, contour_handle] = contour(lat, lon, depth_km, -11:1:11, 'k'); % Black lines
+clabel(contour_matrix, contour_handle); % Label contours automatically
+hold off;
+
+% Analysis - Find the deepest point sampled in the trench
+[min_depth, min_index] = min(depth_km(:)); % Find minimum depth and its index
+[row, col] = ind2sub(size(depth_km), min_index); % Convert index to row and column
+
+% Retrieve latitude and longitude of the deepest point
+deepest_latitude = lat(col);
+deepest_longitude = lon(row);
+
+% Display results for the deepest point
+disp(['The deepest point sampled is ', num2str(min_depth), ' km at latitude ', ...
+      num2str(deepest_latitude), '° and longitude ', num2str(deepest_longitude), '°.']);
+
+% Calculate the average depth for regions deeper than 6 km
+deeper_than_ocean_floor = depth_km(depth_km < -6); % Select depths below 6 km
+average_depth = mean(deeper_than_ocean_floor);
+
+% Display the average depth result
+disp(['The average depth of the trench for depths below 6 km is ', num2str(average_depth), ' km.']);
+
+%% Section 2.2
+
+% Load or define matrix A here (e.g., A = importdata('mariana_depth.csv'))
+% A = ... 
+
+% Step 1: Initialize the depth matrix A as loaded from the file
+A = depth;
+ATA = A' * A;  % Calculate ATA
+
+% Parameters
+num_eigenvectors = 50; % Number of largest eigenvalues/eigenvectors to compute
+tolerance = 1e-3;      % Convergence tolerance for power iteration
+
+% Initialize storage for eigenvalues and eigenvectors
+V = zeros(size(ATA, 2), num_eigenvectors); % Store top 50 eigenvectors
+eigenvalues = zeros(1, num_eigenvectors);   % Store top 50 eigenvalues
+
+% Step 2: Power Iteration for First Eigenvector
+% (a) Start with a random initial vector of norm 1
+n = size(ATA, 2); % Dimension of ATA
+u = randn(n, 1);  % Random initial vector
+u = u / norm(u);  % Normalize to make it a unit vector
+
+for i = 1:num_eigenvectors
+    % Power Iteration with Orthogonalization for each eigenvector
+    while true
+        % (b) Apply ATA to the current vector
+        u_next = ATA * u;
+        
+        % (c) Orthogonalize against previously computed eigenvectors
+        for j = 1:i-1
+            u_next = u_next - (V(:, j)' * u_next) * V(:, j);
+        end
+        
+        % Normalize u_next
+        u_next = u_next / norm(u_next);
+        
+        % Check for convergence
+        if norm(u_next - u) < tolerance
+            break;
+        end
+        
+        % Update u for the next iteration
+        u = u_next;
+    end
+    
+    % Store the converged eigenvector and compute its eigenvalue
+    V(:, i) = u_next;                          % Store eigenvector in V
+    eigenvalues(i) = u_next' * ATA * u_next;    % Rayleigh quotient for eigenvalue
+    
+    % Prepare u for the next eigenvector computation
+    if i < num_eigenvectors
+        u = randn(n, 1);   % Randomize starting vector for next iteration
+        u = u / norm(u);   % Normalize to make it a unit vector
+    end
+end
+
+% Plot the first eigenvector as required
+figure;
+plot(V(:, 1), '-o');
+title('First Eigenvector of ATA');
+xlabel('Index');
+ylabel('Component Value');
+
+% Plot the eigenvalues in a semilog plot
+figure;
+semilogy(eigenvalues, '-o');
+title('Top 50 Eigenvalues of ATA');
+xlabel('Index');
+ylabel('Eigenvalue (log scale)');
+
+%% Section 2.3 - Construct Incomplete SVD and Compare
+
+% Step 1: Construct Σ (Sigma) as a diagonal matrix with the square roots of the eigenvalues
+Sigma = diag(sqrt(eigenvalues(1:num_eigenvectors)));
+
+% Step 2: Calculate U as A * V / Sigma for each column
+U = zeros(size(A, 1), num_eigenvectors);
+for i = 1:num_eigenvectors
+    U(:, i) = A * V(:, i) / Sigma(i, i);
+end
+
+% Step 3: Reconstruct A using U * Sigma * V'
+A_reconstructed = U * Sigma * V';
+
+% Display the reconstructed depth data as an image
+figure;
+imagesc(lat, lon, A_reconstructed / 1000); % Convert to km for display
+title('Reconstructed Depth of the Mariana Trench (in km)');
+xlabel('Latitude (deg)');
+ylabel('Longitude (deg)');
+colormap('jet');
+colorbar;
+set(gca, 'YDir', 'normal'); % Ensure latitude increases northward
+
+% Display the reconstructed depth data as a contour map
+figure;
+contourf(lat, lon, A_reconstructed / 1000, -11:1:11); % Contours every 1 km from -11 to 11
+colormap('jet');
+colorbar;
+title('Reconstructed Topographic Contour Map of Mariana Trench (in km)');
+xlabel('Latitude (deg)');
+ylabel('Longitude (deg)');
+
+% Overlay contour lines for labeling
+hold on;
+[contour_matrix, contour_handle] = contour(lat, lon, A_reconstructed / 1000, -11:1:11, 'k'); % Black lines
+clabel(contour_matrix, contour_handle); % Label contours automatically
+hold off;
+
+% Analysis - Find the deepest point sampled in the reconstructed trench
+[min_depth_reconstructed, min_index_reconstructed] = min(A_reconstructed(:) / 1000); % Find minimum depth and its index
+[row_reconstructed, col_reconstructed] = ind2sub(size(A_reconstructed), min_index_reconstructed);
+
+% Retrieve latitude and longitude of the deepest point in the reconstructed data
+deepest_latitude_reconstructed = lat(col_reconstructed);
+deepest_longitude_reconstructed = lon(row_reconstructed);
+
+% Display results for the deepest point in the reconstructed data
+disp(['The deepest point in the reconstructed data is ', num2str(min_depth_reconstructed), ...
+      ' km at latitude ', num2str(deepest_latitude_reconstructed), '° and longitude ', ...
+      num2str(deepest_longitude_reconstructed), '°.']);
+
+% Calculate the average depth for regions deeper than 6 km in the reconstructed data
+deeper_than_ocean_floor_reconstructed = A_reconstructed(A_reconstructed / 1000 < -6); % Select depths below 6 km
+average_depth_reconstructed = mean(deeper_than_ocean_floor_reconstructed) / 1000;
+
+% Display the average depth result for the reconstructed data
+disp(['The average depth of the reconstructed trench for depths below 6 km is ', ...
+      num2str(average_depth_reconstructed), ' km.']);
+
+%% Comparison with Original Data
+% Display the difference in mean and maximum depths
+disp(['Difference in deepest point: ', num2str(abs(min_depth - min_depth_reconstructed)), ' km.']);
+disp(['Difference in average depth for depths below 6 km: ', ...
+      num2str(abs(average_depth - average_depth_reconstructed)), ' km.']);
+
